@@ -1,12 +1,19 @@
 # nodes/ingest.py
-from langchain_community.document_loaders import PDFPlumberLoader, PyMuPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from state import ComplianceState
+from dotenv import load_dotenv
+import pymupdf4llm
 import re
 import os
 
-PDF1_PATH = os.getenv("PDF1_PATH", "data/pdf1.pdf")  # CB test report  — PDFPlumber
-PDF2_PATH = os.getenv("PDF2_PATH", "data/pdf2.pdf")  # COC certificate — PyMuPDF
+load_dotenv()
+
+PDF1_PATH = os.getenv("PDF1_PATH")
+PDF2_PATH = os.getenv("PDF2_PATH")
+
+print("PDF1:", PDF1_PATH)
+print("PDF2:", PDF2_PATH)
 
 
 def clean_text(text: str) -> str:
@@ -17,39 +24,16 @@ def clean_text(text: str) -> str:
 
 def ingest_node(state: ComplianceState) -> dict:
 
-    # --- PDF 1 : CB test report (has tables, clause/requirement/result columns)
-    loader1 = PDFPlumberLoader(PDF1_PATH)
-    docs1   = loader1.load()
-    for doc in docs1:
-        doc.page_content = clean_text(doc.page_content)
+    # PDF1 — image-based CB test report, using pymupdf4llm
+    # To -- ramro saanga hernu -- handles scanned tables, marking plates, clause/result tables
+    raw1      = pymupdf4llm.to_markdown(PDF1_PATH)
+    pdf1_text = clean_text(raw1)
+    print(f"[ingest] PDF1 — chars: {len(pdf1_text)}")
 
-    total_chars1 = sum(len(d.page_content) for d in docs1)
-
-    if total_chars1 < 5_000:
-        chunk_size1, chunk_overlap1 = 500,  50
-    elif total_chars1 < 20_000:
-        chunk_size1, chunk_overlap1 = 800,  150
-    elif total_chars1 < 50_000:
-        chunk_size1, chunk_overlap1 = 1000, 200
-    elif total_chars1 < 100_000:
-        chunk_size1, chunk_overlap1 = 1200, 250
-    else:
-        chunk_size1, chunk_overlap1 = 1500, 300
-
-    splitter1 = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size1,
-        chunk_overlap=chunk_overlap1,
-        separators=["\n\n", "\n", " ", ""],
-    )
-    chunks1   = splitter1.split_documents(docs1)
-    pdf1_text = "\n\n".join(c.page_content for c in chunks1)
-
-    print(f"[ingest] PDF1 — pages: {len(docs1)} | chars: {total_chars1} | chunks: {len(chunks1)}")
-
-    # --- PDF 2 : COC certificate (mostly text + model list)
+    # PDF2 — clean text COC certificate, using PyMuPDFLoader
     loader2 = PyMuPDFLoader(PDF2_PATH)
     docs2   = loader2.load()
-    for doc in docs2:
+    for doc in docs2: 
         doc.page_content = clean_text(doc.page_content)
 
     total_chars2 = sum(len(d.page_content) for d in docs2)
