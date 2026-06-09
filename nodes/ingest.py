@@ -23,24 +23,24 @@ def clean_text(text: str) -> str:
 
 def ingest_node(state: ComplianceState) -> dict:
 
-    # PDF1 — image-based CB test report, using pymupdf4llm
-    # To -- ramro saanga hernu -- handles scanned tables, marking plates, clause/result tables
-    raw1      = pymupdf4llm.to_markdown(PDF1_PATH)
+    # PDF1 — CB Test Report, image-based, OCR via pymupdf4llm
+    # handles scanned tables, marking plates, clause/result tables
+    raw1 = pymupdf4llm.to_markdown(PDF1_PATH)
     pdf1_text = clean_text(raw1)
     print(f"[ingest] PDF1 — chars: {len(pdf1_text)}")
 
     # PDF2 — clean text COC certificate, using PyMuPDFLoader
     loader2 = PyMuPDFLoader(PDF2_PATH)
-    docs2   = loader2.load()
-    for doc in docs2: 
+    docs2 = loader2.load()
+    for doc in docs2:
         doc.page_content = clean_text(doc.page_content)
 
     total_chars2 = sum(len(d.page_content) for d in docs2)
 
     if total_chars2 < 5_000:
-        chunk_size2, chunk_overlap2 = 500,  50
+        chunk_size2, chunk_overlap2 = 500, 50
     elif total_chars2 < 20_000:
-        chunk_size2, chunk_overlap2 = 800,  150
+        chunk_size2, chunk_overlap2 = 800, 150
     elif total_chars2 < 50_000:
         chunk_size2, chunk_overlap2 = 1000, 200
     elif total_chars2 < 100_000:
@@ -53,10 +53,12 @@ def ingest_node(state: ComplianceState) -> dict:
         chunk_overlap=chunk_overlap2,
         separators=["\n\n", "\n", " ", ""],
     )
-    chunks2   = splitter2.split_documents(docs2)
+    chunks2 = splitter2.split_documents(docs2)
     pdf2_text = "\n\n".join(c.page_content for c in chunks2)
 
-    print(f"[ingest] PDF2 — pages: {len(docs2)} | chars: {total_chars2} | chunks: {len(chunks2)}")
+    print(
+        f"[ingest] PDF2 — pages: {len(docs2)} | chars: {total_chars2} | chunks: {len(chunks2)}"
+    )
 
     return {
         "pdf1_text": pdf1_text,
